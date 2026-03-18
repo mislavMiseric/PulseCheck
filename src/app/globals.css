@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+html,
+body {
+  min-height: 100vh;
+}
+
+body {
+  background: linear-gradient(180deg, #08060c 0%, #9b76d4 100%);
+  background-attachment: fixed;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(27, 19, 38, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(155, 118, 212, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(155, 118, 212, 0.6);
+}
