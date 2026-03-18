@@ -1,9 +1,10 @@
 interface BarChartProps {
   options: string[];
   votes: number[];
+  otherTexts?: string[];
 }
 
-export function BarChart({ options, votes }: BarChartProps) {
+export function BarChart({ options, votes, otherTexts }: BarChartProps) {
   const total = votes.reduce((a, b) => a + b, 0);
   const maxVotes = Math.max(...votes, 1);
 
@@ -34,6 +35,23 @@ export function BarChart({ options, votes }: BarChartProps) {
       <p className="pt-2 text-center text-sm text-white/60">
         {total} total vote{total !== 1 ? 's' : ''}
       </p>
+      {otherTexts && otherTexts.length > 0 && (
+        <div className="mt-2 rounded-lg border border-[rgba(155,118,212,0.25)] bg-white/5 p-4">
+          <p className="mb-2 text-sm font-semibold text-white/75">
+            &ldquo;Other&rdquo; responses:
+          </p>
+          <ul className="space-y-1">
+            {otherTexts.map((text, i) => (
+              <li
+                key={i}
+                className="rounded-md bg-white/5 px-3 py-1.5 text-sm text-white/90"
+              >
+                {text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

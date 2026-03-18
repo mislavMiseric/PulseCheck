@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    const { questionId, optionIndex } = await request.json();
+    const { questionId, optionIndex, otherText } = await request.json();
 
     if (!questionId || typeof questionId !== 'string') {
       return NextResponse.json(
@@ -21,7 +21,14 @@ export async function POST(request: Request) {
       );
     }
 
-    recordVote(questionId, optionIndex);
+    if (otherText !== undefined && typeof otherText !== 'string') {
+      return NextResponse.json(
+        { error: 'otherText must be a string' },
+        { status: 400 },
+      );
+    }
+
+    recordVote(questionId, optionIndex, otherText);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Bad request';

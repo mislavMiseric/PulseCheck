@@ -12,6 +12,8 @@ interface Question {
   options: string[];
   status: 'draft' | 'open' | 'closed';
   votes: number[];
+  allowOther: boolean;
+  otherTexts: string[];
 }
 
 interface SessionState {
@@ -222,6 +224,7 @@ function CreateQuestionForm({
 }) {
   const [text, setText] = useState('');
   const [options, setOptions] = useState(['', '']);
+  const [allowOther, setAllowOther] = useState(false);
   const [loading, setLoading] = useState(false);
 
   function addOption() {
@@ -245,7 +248,7 @@ function CreateQuestionForm({
       const res = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, options }),
+        body: JSON.stringify({ text, options, allowOther }),
         credentials: 'include',
       });
       if (!res.ok) {
@@ -254,6 +257,7 @@ function CreateQuestionForm({
       }
       setText('');
       setOptions(['', '']);
+      setAllowOther(false);
       showToast('Question created');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed');
@@ -321,6 +325,18 @@ function CreateQuestionForm({
           )}
         </div>
 
+        <label className="flex cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            checked={allowOther}
+            onChange={(e) => setAllowOther(e.target.checked)}
+            className="h-4 w-4 rounded border-white/20 bg-white/5 accent-[#7E5BB6]"
+          />
+          <span className="text-sm text-white/75">
+            Allow &ldquo;Other&rdquo; (free-text) option
+          </span>
+        </label>
+
         <Button type="submit" disabled={loading} className="w-full justify-center">
           {loading ? 'Creating...' : 'Create Question'}
         </Button>
@@ -374,7 +390,7 @@ function ActiveControls({
             <span className="font-medium text-white">{activeQ.text}</span>
           </p>
           <div className="mb-3">
-            <BarChart options={activeQ.options} votes={activeQ.votes} />
+            <BarChart options={activeQ.options} votes={activeQ.votes} otherTexts={activeQ.otherTexts} />
           </div>
           <Button onClick={handleClose} className="w-full justify-center">
             Close Current Question
@@ -454,9 +470,17 @@ function QuestionList({
               <p className="text-sm text-white/50">
                 {q.options.join(' / ')}
               </p>
+              {q.allowOther && (
+                <span className="mt-1 inline-block text-xs text-[#9B76D4]">
+                  + Other (free-text)
+                </span>
+              )}
               {q.status === 'closed' && (
                 <p className="mt-1 text-xs text-white/40">
                   Votes: {q.votes.join(', ')}
+                  {q.otherTexts.length > 0 && (
+                    <> &middot; Other responses: {q.otherTexts.join(', ')}</>
+                  )}
                 </p>
               )}
             </div>

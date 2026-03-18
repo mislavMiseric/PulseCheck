@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const { text, options } = await request.json();
+    const { text, options, allowOther } = await request.json();
 
     if (!text || typeof text !== 'string' || !text.trim()) {
       return NextResponse.json(
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     const question = addQuestion(
       text.trim(),
       options.map((o: string) => o.trim()),
+      !!allowOther,
     );
 
     return NextResponse.json({ question });

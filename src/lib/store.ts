@@ -6,6 +6,8 @@ export interface Question {
   options: string[];
   status: 'draft' | 'open' | 'closed';
   votes: number[];
+  allowOther: boolean;
+  otherTexts: string[];
 }
 
 export interface SessionState {
@@ -40,14 +42,17 @@ export function getState(): SessionState {
   return { ...getStore() };
 }
 
-export function addQuestion(text: string, options: string[]): Question {
+export function addQuestion(text: string, options: string[], allowOther = false): Question {
   const store = getStore();
+  const allOptions = allowOther ? [...options, 'Other'] : options;
   const q: Question = {
     id: crypto.randomUUID(),
     text,
-    options,
+    options: allOptions,
     status: 'draft',
-    votes: new Array(options.length).fill(0),
+    votes: new Array(allOptions.length).fill(0),
+    allowOther,
+    otherTexts: [],
   };
   store.questions.push(q);
   touch();
@@ -67,6 +72,7 @@ export function openQuestion(id: string): Question {
 
   q.status = 'open';
   q.votes = new Array(q.options.length).fill(0);
+  q.otherTexts = [];
   store.activeQuestionId = id;
   touch();
   return q;
@@ -85,7 +91,7 @@ export function closeQuestion(): Question | null {
   return q;
 }
 
-export function recordVote(questionId: string, optionIndex: number): void {
+export function recordVote(questionId: string, optionIndex: number, otherText?: string): void {
   const store = getStore();
   const q = store.questions.find((q) => q.id === questionId);
   if (!q) throw new Error('Question not found');
@@ -93,7 +99,14 @@ export function recordVote(questionId: string, optionIndex: number): void {
   if (optionIndex < 0 || optionIndex >= q.options.length) {
     throw new Error('Invalid option index');
   }
+  const isOtherIndex = q.allowOther && optionIndex === q.options.length - 1;
+  if (isOtherIndex && (!otherText || !otherText.trim())) {
+    throw new Error('Text is required for the "Other" option');
+  }
   q.votes[optionIndex]++;
+  if (isOtherIndex && otherText) {
+    q.otherTexts.push(otherText.trim());
+  }
   touch();
 }
 
