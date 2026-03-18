@@ -8,6 +8,7 @@ export interface Question {
   votes: number[];
   allowOther: boolean;
   otherTexts: string[];
+  updatedAt: number;
 }
 
 export interface SessionState {
@@ -53,6 +54,7 @@ export function addQuestion(text: string, options: string[], allowOther = false)
     votes: new Array(allOptions.length).fill(0),
     allowOther,
     otherTexts: [],
+    updatedAt: Date.now(),
   };
   store.questions.push(q);
   touch();
@@ -64,15 +66,18 @@ export function openQuestion(id: string): Question {
   const q = store.questions.find((q) => q.id === id);
   if (!q) throw new Error('Question not found');
 
+  const now = Date.now();
   for (const other of store.questions) {
     if (other.status === 'open') {
       other.status = 'closed';
+      other.updatedAt = now;
     }
   }
 
   q.status = 'open';
   q.votes = new Array(q.options.length).fill(0);
   q.otherTexts = [];
+  q.updatedAt = now;
   store.activeQuestionId = id;
   touch();
   return q;
@@ -85,6 +90,7 @@ export function closeQuestion(): Question | null {
   if (!q) return null;
 
   q.status = 'closed';
+  q.updatedAt = Date.now();
   store.lastClosedQuestionId = store.activeQuestionId;
   store.activeQuestionId = null;
   touch();
@@ -107,6 +113,7 @@ export function recordVote(questionId: string, optionIndex: number, otherText?: 
   if (isOtherIndex && otherText) {
     q.otherTexts.push(otherText.trim());
   }
+  q.updatedAt = Date.now();
   touch();
 }
 

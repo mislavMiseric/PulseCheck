@@ -39,8 +39,16 @@ export default function AdminPage() {
 
     connectSSE();
 
+    const reconnectTimer = setInterval(() => {
+      if (!cancelled) {
+        esRef.current?.close();
+        connectSSE();
+      }
+    }, 10_000);
+
     return () => {
       cancelled = true;
+      clearInterval(reconnectTimer);
       esRef.current?.close();
     };
   }, [authed]);

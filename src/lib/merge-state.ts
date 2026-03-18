@@ -6,6 +6,7 @@ export interface Question {
   votes: number[];
   allowOther: boolean;
   otherTexts: string[];
+  updatedAt: number;
 }
 
 export interface SessionState {
@@ -29,7 +30,12 @@ export function mergeState(
 
   const map = new Map<string, Question>();
   for (const q of prev.questions) map.set(q.id, q);
-  for (const q of incoming.questions) map.set(q.id, q);
+  for (const q of incoming.questions) {
+    const existing = map.get(q.id);
+    if (!existing || (q.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
+      map.set(q.id, q);
+    }
+  }
 
   const hasCompleteView =
     incoming.questions.length >= prev.questions.length;
