@@ -50,6 +50,20 @@ export default function AudiencePage() {
     };
   }, []);
 
+  useEffect(() => {
+    const activeId = state?.activeQuestionId;
+    if (activeId) {
+      setVotedIds((prev) => {
+        if (prev.has(activeId)) {
+          const next = new Set(prev);
+          next.delete(activeId);
+          return next;
+        }
+        return prev;
+      });
+    }
+  }, [state?.activeQuestionId]);
+
   const activeQuestion = state?.questions.find(
     (q) => q.id === state.activeQuestionId,
   );
