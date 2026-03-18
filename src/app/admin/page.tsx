@@ -374,30 +374,42 @@ function ActiveControls({
 
   async function handleClose() {
     setClosing(true);
-    try {
-      const res = await fetch('/api/admin/close', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setState((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            questions: prev.questions.map((q) => (q.id === data.question.id ? data.question : q)),
-            activeQuestionId: null,
-            lastClosedQuestionId: data.question.id,
-            version: prev.version + 1,
-          };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch('/api/admin/close', {
+          method: 'POST',
+          credentials: 'include',
         });
-        showToast('Question closed');
-      } else {
+        if (res.ok) {
+          const data = await res.json();
+          setState((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              questions: prev.questions.map((q) => (q.id === data.question.id ? data.question : q)),
+              activeQuestionId: null,
+              lastClosedQuestionId: data.question.id,
+              version: prev.version + 1,
+            };
+          });
+          showToast('Question closed');
+          setClosing(false);
+          return;
+        }
+        if (attempt < 2 && (res.status === 400 || res.status === 401)) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        showToast('Failed to close question');
+      } catch {
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
         showToast('Failed to close question');
       }
-    } finally {
-      setClosing(false);
     }
+    setClosing(false);
   }
 
   async function handleReset() {
@@ -487,35 +499,47 @@ function QuestionList({
 
   async function handleOpen(questionId: string) {
     setOpening(questionId);
-    try {
-      const res = await fetch('/api/admin/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionId }),
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setState((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            questions: prev.questions.map((q) => {
-              if (q.id === data.question.id) return data.question;
-              if (q.status === 'open') return { ...q, status: 'closed' as const };
-              return q;
-            }),
-            activeQuestionId: data.question.id,
-            version: prev.version + 1,
-          };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch('/api/admin/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questionId }),
+          credentials: 'include',
         });
-        showToast('Question opened');
-      } else {
+        if (res.ok) {
+          const data = await res.json();
+          setState((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              questions: prev.questions.map((q) => {
+                if (q.id === data.question.id) return data.question;
+                if (q.status === 'open') return { ...q, status: 'closed' as const };
+                return q;
+              }),
+              activeQuestionId: data.question.id,
+              version: prev.version + 1,
+            };
+          });
+          showToast('Question opened');
+          setOpening(null);
+          return;
+        }
+        if (attempt < 2 && (res.status === 400 || res.status === 401)) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        showToast('Failed to open question');
+      } catch {
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
         showToast('Failed to open question');
       }
-    } finally {
-      setOpening(null);
     }
+    setOpening(null);
   }
 
   if (state.questions.length === 0) {
