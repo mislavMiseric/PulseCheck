@@ -369,41 +369,53 @@ function ActiveControls({
     (q) => q.id === state.activeQuestionId,
   );
   const [confirmReset, setConfirmReset] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   async function handleClose() {
-    const res = await fetch('/api/admin/close', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setState((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          questions: prev.questions.map((q) => (q.id === data.question.id ? data.question : q)),
-          activeQuestionId: null,
-          lastClosedQuestionId: data.question.id,
-          version: prev.version + 1,
-        };
+    setClosing(true);
+    try {
+      const res = await fetch('/api/admin/close', {
+        method: 'POST',
+        credentials: 'include',
       });
-      showToast('Question closed');
-    } else {
-      showToast('Failed to close question');
+      if (res.ok) {
+        const data = await res.json();
+        setState((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            questions: prev.questions.map((q) => (q.id === data.question.id ? data.question : q)),
+            activeQuestionId: null,
+            lastClosedQuestionId: data.question.id,
+            version: prev.version + 1,
+          };
+        });
+        showToast('Question closed');
+      } else {
+        showToast('Failed to close question');
+      }
+    } finally {
+      setClosing(false);
     }
   }
 
   async function handleReset() {
-    const res = await fetch('/api/admin/reset', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      setState({ questions: [], activeQuestionId: null, lastClosedQuestionId: null, version: 0 });
-      showToast('Session reset');
-      setConfirmReset(false);
-    } else {
-      showToast('Failed to reset');
+    setResetting(true);
+    try {
+      const res = await fetch('/api/admin/reset', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setState({ questions: [], activeQuestionId: null, lastClosedQuestionId: null, version: 0 });
+        showToast('Session reset');
+        setConfirmReset(false);
+      } else {
+        showToast('Failed to reset');
+      }
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -420,8 +432,8 @@ function ActiveControls({
           <div className="mb-3">
             <BarChart options={activeQ.options} votes={activeQ.votes} otherTexts={activeQ.otherTexts} />
           </div>
-          <Button onClick={handleClose} className="w-full justify-center">
-            Close Current Question
+          <Button onClick={handleClose} disabled={closing} className="w-full justify-center">
+            {closing ? 'Closing...' : 'Close Current Question'}
           </Button>
         </div>
       ) : (
@@ -442,13 +454,15 @@ function ActiveControls({
             <Button
               variant="danger"
               onClick={handleReset}
+              disabled={resetting}
               className="flex-1 justify-center"
             >
-              Confirm Reset
+              {resetting ? 'Resetting...' : 'Confirm Reset'}
             </Button>
             <Button
               variant="ghost"
               onClick={() => setConfirmReset(false)}
+              disabled={resetting}
               className="flex-1 justify-center"
             >
               Cancel
@@ -469,31 +483,38 @@ function QuestionList({
   setState: SetState;
   showToast: (msg: string) => void;
 }) {
+  const [opening, setOpening] = useState<string | null>(null);
+
   async function handleOpen(questionId: string) {
-    const res = await fetch('/api/admin/open', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionId }),
-      credentials: 'include',
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setState((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          questions: prev.questions.map((q) => {
-            if (q.id === data.question.id) return data.question;
-            if (q.status === 'open') return { ...q, status: 'closed' as const };
-            return q;
-          }),
-          activeQuestionId: data.question.id,
-          version: prev.version + 1,
-        };
+    setOpening(questionId);
+    try {
+      const res = await fetch('/api/admin/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId }),
+        credentials: 'include',
       });
-      showToast('Question opened');
-    } else {
-      showToast('Failed to open question');
+      if (res.ok) {
+        const data = await res.json();
+        setState((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            questions: prev.questions.map((q) => {
+              if (q.id === data.question.id) return data.question;
+              if (q.status === 'open') return { ...q, status: 'closed' as const };
+              return q;
+            }),
+            activeQuestionId: data.question.id,
+            version: prev.version + 1,
+          };
+        });
+        showToast('Question opened');
+      } else {
+        showToast('Failed to open question');
+      }
+    } finally {
+      setOpening(null);
     }
   }
 
@@ -535,9 +556,10 @@ function QuestionList({
               <Button
                 variant="primary"
                 onClick={() => handleOpen(q.id)}
+                disabled={opening !== null}
                 className="shrink-0"
               >
-                Open
+                {opening === q.id ? 'Opening...' : 'Open'}
               </Button>
             )}
           </Card>

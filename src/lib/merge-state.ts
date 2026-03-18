@@ -37,17 +37,21 @@ export function mergeState(
     }
   }
 
-  const hasCompleteView =
-    incoming.questions.length >= prev.questions.length;
+  const mergedQuestions = Array.from(map.values());
+
+  const openQuestion = mergedQuestions.find((q) => q.status === 'open');
+
+  const lastClosed = mergedQuestions
+    .filter((q) => q.status === 'closed')
+    .reduce<Question | null>((latest, q) => {
+      if (!latest || (q.updatedAt ?? 0) > (latest.updatedAt ?? 0)) return q;
+      return latest;
+    }, null);
 
   return {
-    questions: Array.from(map.values()),
-    activeQuestionId: hasCompleteView
-      ? incoming.activeQuestionId
-      : (incoming.activeQuestionId ?? prev.activeQuestionId),
-    lastClosedQuestionId: hasCompleteView
-      ? incoming.lastClosedQuestionId
-      : (incoming.lastClosedQuestionId ?? prev.lastClosedQuestionId),
+    questions: mergedQuestions,
+    activeQuestionId: openQuestion?.id ?? null,
+    lastClosedQuestionId: lastClosed?.id ?? null,
     version: Math.max(prev.version, incoming.version),
   };
 }
