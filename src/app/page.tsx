@@ -103,7 +103,7 @@ export default function AudiencePage() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6">
       <div className="w-full max-w-2xl">
         <h1 className="mb-2 text-center text-lg font-semibold tracking-wider text-white/60 uppercase">
-          PulseCheck
+          {process.env.NEXT_PUBLIC_APP_NAME || 'PulseCheck'}
         </h1>
 
         {!state && (

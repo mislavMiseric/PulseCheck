@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'PulseCheck',
+  title: process.env.NEXT_PUBLIC_APP_NAME || 'PulseCheck',
   description: 'Live presentation polls & surveys',
 };
 

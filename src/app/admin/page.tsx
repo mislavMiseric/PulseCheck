@@ -124,7 +124,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     <main className="flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <h1 className="mb-6 text-center text-2xl font-bold text-white">
-          PulseCheck Admin
+          {process.env.NEXT_PUBLIC_APP_NAME || 'PulseCheck'} Admin
         </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -184,7 +184,7 @@ function Dashboard({
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-3xl">
         <header className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">PulseCheck Admin</h1>
+          <h1 className="text-2xl font-bold text-white">{process.env.NEXT_PUBLIC_APP_NAME || 'PulseCheck'} Admin</h1>
           <Button variant="ghost" onClick={onLogout}>
             Logout
           </Button>
