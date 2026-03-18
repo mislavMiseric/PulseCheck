@@ -67,26 +67,41 @@ export default function AudiencePage() {
   async function handleVote(questionId: string, optionIndex: number, text?: string) {
     setVoting(true);
     setError(null);
-    try {
-      const body: Record<string, unknown> = { questionId, optionIndex };
-      if (text) body.otherText = text;
-      const res = await fetch('/api/vote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
+    const body: Record<string, unknown> = { questionId, optionIndex };
+    if (text) body.otherText = text;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch('/api/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          setVotedIds((prev) => new Set(prev).add(questionId));
+          setShowOtherInput(false);
+          setOtherText('');
+          setVoting(false);
+          return;
+        }
         const data = await res.json();
+        const isRetryable =
+          attempt < 2 &&
+          (data.error?.includes('not found') || data.error?.includes('not open'));
+        if (isRetryable) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
         throw new Error(data.error || 'Vote failed');
+      } catch (err) {
+        if (attempt === 2 || !(err instanceof Error) || !err.message.includes('not found')) {
+          setError(err instanceof Error ? err.message : 'Vote failed');
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 500));
       }
-      setVotedIds((prev) => new Set(prev).add(questionId));
-      setShowOtherInput(false);
-      setOtherText('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Vote failed');
-    } finally {
-      setVoting(false);
     }
+    setVoting(false);
   }
 
   function handleOptionClick(questionId: string, optionIndex: number, question: Question) {
