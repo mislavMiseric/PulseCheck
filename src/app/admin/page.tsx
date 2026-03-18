@@ -80,6 +80,7 @@ export default function AdminPage() {
   return (
     <Dashboard
       state={state}
+      setState={setState}
       toast={toast}
       showToast={showToast}
       onLogout={() => {
@@ -174,13 +175,17 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+type SetState = React.Dispatch<React.SetStateAction<SessionState | null>>;
+
 function Dashboard({
   state,
+  setState,
   toast,
   showToast,
   onLogout,
 }: {
   state: SessionState | null;
+  setState: SetState;
   toast: string | null;
   showToast: (msg: string) => void;
   onLogout: () => void;
@@ -201,12 +206,12 @@ function Dashboard({
           </div>
         )}
 
-        <CreateQuestionForm showToast={showToast} />
+        <CreateQuestionForm showToast={showToast} setState={setState} />
 
         {state && (
           <>
-            <ActiveControls state={state} showToast={showToast} />
-            <QuestionList state={state} showToast={showToast} />
+            <ActiveControls state={state} setState={setState} showToast={showToast} />
+            <QuestionList state={state} setState={setState} showToast={showToast} />
           </>
         )}
 
@@ -224,8 +229,10 @@ function Dashboard({
 
 function CreateQuestionForm({
   showToast,
+  setState,
 }: {
   showToast: (msg: string) => void;
+  setState: SetState;
 }) {
   const [text, setText] = useState('');
   const [options, setOptions] = useState(['', '']);
@@ -260,6 +267,12 @@ function CreateQuestionForm({
         const data = await res.json();
         throw new Error(data.error || 'Failed');
       }
+      const data = await res.json();
+      setState((prev) =>
+        prev
+          ? { ...prev, questions: [...prev.questions, data.question], version: prev.version + 1 }
+          : { questions: [data.question], activeQuestionId: null, lastClosedQuestionId: null, version: 1 },
+      );
       setText('');
       setOptions(['', '']);
       setAllowOther(false);
@@ -352,9 +365,11 @@ function CreateQuestionForm({
 
 function ActiveControls({
   state,
+  setState,
   showToast,
 }: {
   state: SessionState;
+  setState: SetState;
   showToast: (msg: string) => void;
 }) {
   const activeQ = state.questions.find(
@@ -367,8 +382,22 @@ function ActiveControls({
       method: 'POST',
       credentials: 'include',
     });
-    if (res.ok) showToast('Question closed');
-    else showToast('Failed to close question');
+    if (res.ok) {
+      const data = await res.json();
+      setState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions.map((q) => (q.id === data.question.id ? data.question : q)),
+          activeQuestionId: null,
+          lastClosedQuestionId: data.question.id,
+          version: prev.version + 1,
+        };
+      });
+      showToast('Question closed');
+    } else {
+      showToast('Failed to close question');
+    }
   }
 
   async function handleReset() {
@@ -377,6 +406,7 @@ function ActiveControls({
       credentials: 'include',
     });
     if (res.ok) {
+      setState({ questions: [], activeQuestionId: null, lastClosedQuestionId: null, version: 0 });
       showToast('Session reset');
       setConfirmReset(false);
     } else {
@@ -439,9 +469,11 @@ function ActiveControls({
 
 function QuestionList({
   state,
+  setState,
   showToast,
 }: {
   state: SessionState;
+  setState: SetState;
   showToast: (msg: string) => void;
 }) {
   async function handleOpen(questionId: string) {
@@ -451,8 +483,25 @@ function QuestionList({
       body: JSON.stringify({ questionId }),
       credentials: 'include',
     });
-    if (res.ok) showToast('Question opened');
-    else showToast('Failed to open question');
+    if (res.ok) {
+      const data = await res.json();
+      setState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions.map((q) => {
+            if (q.id === data.question.id) return data.question;
+            if (q.status === 'open') return { ...q, status: 'closed' as const };
+            return q;
+          }),
+          activeQuestionId: data.question.id,
+          version: prev.version + 1,
+        };
+      });
+      showToast('Question opened');
+    } else {
+      showToast('Failed to open question');
+    }
   }
 
   if (state.questions.length === 0) {
