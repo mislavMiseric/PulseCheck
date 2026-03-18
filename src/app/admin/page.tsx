@@ -5,23 +5,7 @@ import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/Badge';
 import { BarChart } from '@/components/BarChart';
-
-interface Question {
-  id: string;
-  text: string;
-  options: string[];
-  status: 'draft' | 'open' | 'closed';
-  votes: number[];
-  allowOther: boolean;
-  otherTexts: string[];
-}
-
-interface SessionState {
-  questions: Question[];
-  activeQuestionId: string | null;
-  lastClosedQuestionId: string | null;
-  version: number;
-}
+import { mergeState, type SessionState } from '@/lib/merge-state';
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -44,7 +28,8 @@ export default function AdminPage() {
       const es = new EventSource('/api/events');
       esRef.current = es;
       es.addEventListener('state', (e) => {
-        setState(JSON.parse(e.data));
+        const incoming: SessionState = JSON.parse(e.data);
+        setState((prev) => mergeState(prev, incoming));
       });
       es.onerror = () => {
         es.close();

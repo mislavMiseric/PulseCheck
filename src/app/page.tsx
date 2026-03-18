@@ -4,23 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { BarChart } from '@/components/BarChart';
-
-interface Question {
-  id: string;
-  text: string;
-  options: string[];
-  status: 'draft' | 'open' | 'closed';
-  votes: number[];
-  allowOther: boolean;
-  otherTexts: string[];
-}
-
-interface SessionState {
-  questions: Question[];
-  activeQuestionId: string | null;
-  lastClosedQuestionId: string | null;
-  version: number;
-}
+import { mergeState, type Question, type SessionState } from '@/lib/merge-state';
 
 export default function AudiencePage() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -40,7 +24,8 @@ export default function AudiencePage() {
       esRef.current = es;
 
       es.addEventListener('state', (e) => {
-        setState(JSON.parse(e.data));
+        const incoming: SessionState = JSON.parse(e.data);
+        setState((prev) => mergeState(prev, incoming));
       });
 
       es.onerror = () => {
@@ -51,8 +36,16 @@ export default function AudiencePage() {
 
     connectSSE();
 
+    const reconnectTimer = setInterval(() => {
+      if (!cancelled) {
+        esRef.current?.close();
+        connectSSE();
+      }
+    }, 10_000);
+
     return () => {
       cancelled = true;
+      clearInterval(reconnectTimer);
       esRef.current?.close();
     };
   }, []);
