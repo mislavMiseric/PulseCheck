@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getSessionToken, destroySession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
-  const token = getSessionToken(request);
-  if (token) destroySession(token);
-
+export async function POST() {
   const response = NextResponse.json({ ok: true });
   response.cookies.set('admin_session', '', {
     httpOnly: true,

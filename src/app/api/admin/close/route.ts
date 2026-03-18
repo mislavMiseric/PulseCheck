@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth';
 import { closeQuestion } from '@/lib/store';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const authResult = requireAdmin(request);

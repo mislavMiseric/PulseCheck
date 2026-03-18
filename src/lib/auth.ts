@@ -1,29 +1,39 @@
 import { NextResponse } from 'next/server';
+import { createHmac, timingSafeEqual } from 'crypto';
 
-const GLOBAL_KEY = '__pulsecheck_sessions__';
+function getSecret(): string {
+  return process.env.ADMIN_PASSWORD || 'pulsecheck-fallback-secret';
+}
 
-type SessionMap = Map<string, { createdAt: number }>;
-
-function getSessionMap(): SessionMap {
-  const g = globalThis as unknown as Record<string, SessionMap>;
-  if (!g[GLOBAL_KEY]) {
-    g[GLOBAL_KEY] = new Map();
-  }
-  return g[GLOBAL_KEY];
+function sign(payload: string): string {
+  return createHmac('sha256', getSecret()).update(payload).digest('hex');
 }
 
 export function createSession(): string {
-  const token = crypto.randomUUID();
-  getSessionMap().set(token, { createdAt: Date.now() });
-  return token;
+  const payload = Buffer.from(
+    JSON.stringify({ createdAt: Date.now() }),
+  ).toString('base64url');
+  const signature = sign(payload);
+  return `${payload}.${signature}`;
 }
 
 export function validateSession(token: string): boolean {
-  return getSessionMap().has(token);
-}
+  const dotIndex = token.indexOf('.');
+  if (dotIndex === -1) return false;
+  const payload = token.slice(0, dotIndex);
+  const providedSig = token.slice(dotIndex + 1);
 
-export function destroySession(token: string): void {
-  getSessionMap().delete(token);
+  const expectedSig = sign(payload);
+
+  if (providedSig.length !== expectedSig.length) return false;
+  try {
+    return timingSafeEqual(
+      Buffer.from(providedSig, 'hex'),
+      Buffer.from(expectedSig, 'hex'),
+    );
+  } catch {
+    return false;
+  }
 }
 
 function parseCookies(cookieHeader: string): Record<string, string> {

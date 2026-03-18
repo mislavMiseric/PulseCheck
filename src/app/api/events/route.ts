@@ -7,16 +7,19 @@ export const dynamic = 'force-dynamic';
 const encoder = new TextEncoder();
 
 export async function GET() {
+  let streamController: ReadableStreamDefaultController<Uint8Array>;
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      streamController = controller;
       const initPayload = encoder.encode(
         `event: state\ndata: ${JSON.stringify(getState())}\n\n`,
       );
       controller.enqueue(initPayload);
       subscribe(controller);
     },
-    cancel(controller) {
-      unsubscribe(controller as ReadableStreamDefaultController<Uint8Array>);
+    cancel() {
+      unsubscribe(streamController);
     },
   });
 

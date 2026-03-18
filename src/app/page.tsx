@@ -32,27 +32,28 @@ export default function AudiencePage() {
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    const es = new EventSource('/api/events');
-    esRef.current = es;
+    let cancelled = false;
 
-    es.addEventListener('state', (e) => {
-      const data: SessionState = JSON.parse(e.data);
-      setState(data);
-    });
+    function connectSSE() {
+      if (cancelled) return;
+      const es = new EventSource('/api/events');
+      esRef.current = es;
 
-    es.onerror = () => {
-      es.close();
-      setTimeout(() => {
-        esRef.current = new EventSource('/api/events');
-        const retry = esRef.current;
-        retry.addEventListener('state', (e) => {
-          setState(JSON.parse(e.data));
-        });
-      }, 2000);
-    };
+      es.addEventListener('state', (e) => {
+        setState(JSON.parse(e.data));
+      });
+
+      es.onerror = () => {
+        es.close();
+        if (!cancelled) setTimeout(connectSSE, 2000);
+      };
+    }
+
+    connectSSE();
 
     return () => {
-      es.close();
+      cancelled = true;
+      esRef.current?.close();
     };
   }, []);
 

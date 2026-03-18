@@ -37,22 +37,27 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!authed) return;
-    const es = new EventSource('/api/events');
-    esRef.current = es;
-    es.addEventListener('state', (e) => {
-      setState(JSON.parse(e.data));
-    });
-    es.onerror = () => {
-      es.close();
-      setTimeout(() => {
-        const retry = new EventSource('/api/events');
-        esRef.current = retry;
-        retry.addEventListener('state', (e) => {
-          setState(JSON.parse(e.data));
-        });
-      }, 2000);
+    let cancelled = false;
+
+    function connectSSE() {
+      if (cancelled) return;
+      const es = new EventSource('/api/events');
+      esRef.current = es;
+      es.addEventListener('state', (e) => {
+        setState(JSON.parse(e.data));
+      });
+      es.onerror = () => {
+        es.close();
+        if (!cancelled) setTimeout(connectSSE, 2000);
+      };
+    }
+
+    connectSSE();
+
+    return () => {
+      cancelled = true;
+      esRef.current?.close();
     };
-    return () => es.close();
   }, [authed]);
 
   function showToast(msg: string) {

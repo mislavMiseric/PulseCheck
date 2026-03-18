@@ -21,8 +21,9 @@ Open [http://localhost:3000](http://localhost:3000) for the audience view and [h
 
 | Variable         | Description            | Default    |
 | ---------------- | ---------------------- | ---------- |
-| `ADMIN_USERNAME` | Admin login username   | `admin`    |
-| `ADMIN_PASSWORD` | Admin login password   | `changeme` |
+| `ADMIN_USERNAME`      | Admin login username   | `admin`      |
+| `ADMIN_PASSWORD`      | Admin login password   | `changeme`   |
+| `NEXT_PUBLIC_APP_NAME`| Display name in UI     | `PulseCheck` |
 
 Create a `.env` file in the project root (see `.env.example`).
 
@@ -40,6 +41,29 @@ Create a `.env` file in the project root (see `.env.example`).
 - **Server-Sent Events (SSE)** push state changes to all connected clients in real time -- no polling, no page refresh.
 - **In-memory only** -- all data lives in the Node.js server process. State resets on server restart.
 - **No database, no external auth** -- minimal dependencies by design.
+
+## Deployment
+
+This app requires a **single long-running Node.js process** so that in-memory state (questions, votes) and SSE connections are shared across all requests.
+
+### Compatible platforms
+
+- **Railway**, **Render**, **Fly.io**, or any VPS / Docker host
+- Any environment where `node server.js` runs as a persistent process
+
+### NOT compatible
+
+- **Vercel** (serverless functions) -- each route runs in an isolated instance with its own memory, breaking shared state and SSE
+
+### Build and run
+
+```bash
+npm run build
+# The standalone output is in .next/standalone/
+node .next/standalone/server.js
+```
+
+Set the `PORT` environment variable to control the listening port (default 3000).
 
 ## Important Notes
 
