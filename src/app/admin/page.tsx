@@ -575,7 +575,7 @@ function QuestionList({
                 </p>
               )}
             </div>
-            {q.status !== 'open' && (
+            {q.status === 'draft' && (
               <Button
                 variant="primary"
                 onClick={() => handleOpen(q.id)}
