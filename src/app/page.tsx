@@ -13,6 +13,7 @@ export default function AudiencePage() {
   const [error, setError] = useState<string | null>(null);
   const [otherText, setOtherText] = useState('');
   const [showOtherInput, setShowOtherInput] = useState(false);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -52,6 +53,9 @@ export default function AudiencePage() {
 
   useEffect(() => {
     const activeId = state?.activeQuestionId;
+    setSelectedIndices(new Set());
+    setShowOtherInput(false);
+    setOtherText('');
     if (activeId) {
       setVotedIds((prev) => {
         if (prev.has(activeId)) {
@@ -120,6 +124,59 @@ export default function AudiencePage() {
     }
   }
 
+  function toggleIndex(idx: number) {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+
+  async function handleMultiVote(questionId: string) {
+    if (selectedIndices.size === 0) return;
+    setVoting(true);
+    setError(null);
+    const body: Record<string, unknown> = {
+      questionId,
+      optionIndices: Array.from(selectedIndices),
+    };
+    if (otherText.trim()) body.otherText = otherText.trim();
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch('/api/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          setVotedIds((prev) => new Set(prev).add(questionId));
+          setSelectedIndices(new Set());
+          setOtherText('');
+          setVoting(false);
+          return;
+        }
+        const data = await res.json();
+        const isRetryable =
+          attempt < 2 &&
+          (data.error?.includes('not found') || data.error?.includes('not open'));
+        if (isRetryable) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        throw new Error(data.error || 'Vote failed');
+      } catch (err) {
+        if (attempt === 2 || !(err instanceof Error) || !err.message.includes('not found')) {
+          setError(err instanceof Error ? err.message : 'Vote failed');
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+    setVoting(false);
+  }
+
   const hasVoted = activeQuestion ? votedIds.has(activeQuestion.id) : false;
 
   return (
@@ -143,7 +200,57 @@ export default function AudiencePage() {
               {activeQuestion.text}
             </h2>
 
-            {!showOtherInput ? (
+            {activeQuestion.multipleChoice ? (
+              <div className="space-y-3">
+                {activeQuestion.options.map((option, i) => {
+                  const isOther = activeQuestion.allowOther && i === activeQuestion.options.length - 1;
+                  return (
+                    <label
+                      key={i}
+                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-4 transition-colors hover:border-[#7E5BB6]/50 has-[:checked]:border-[#7E5BB6] has-[:checked]:bg-[#7E5BB6]/10"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIndices.has(i)}
+                        onChange={() => {
+                          toggleIndex(i);
+                          if (isOther && selectedIndices.has(i)) setOtherText('');
+                        }}
+                        disabled={voting}
+                        className="h-5 w-5 rounded border-white/20 bg-white/5 accent-[#7E5BB6]"
+                      />
+                      <span className="text-lg text-white">{option}</span>
+                    </label>
+                  );
+                })}
+
+                {activeQuestion.allowOther && selectedIndices.has(activeQuestion.options.length - 1) && (
+                  <input
+                    type="text"
+                    value={otherText}
+                    onChange={(e) => setOtherText(e.target.value)}
+                    placeholder="Type your answer..."
+                    autoFocus
+                    className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-lg text-white placeholder-white/30 outline-none focus:border-[#7E5BB6]"
+                  />
+                )}
+
+                <Button
+                  variant="primary"
+                  disabled={
+                    voting ||
+                    selectedIndices.size === 0 ||
+                    (activeQuestion.allowOther &&
+                      selectedIndices.has(activeQuestion.options.length - 1) &&
+                      !otherText.trim())
+                  }
+                  className="w-full justify-center py-4 text-lg"
+                  onClick={() => handleMultiVote(activeQuestion.id)}
+                >
+                  {voting ? 'Submitting...' : 'Submit'}
+                </Button>
+              </div>
+            ) : !showOtherInput ? (
               <div className="space-y-3">
                 {activeQuestion.options.map((option, i) => (
                   <Button

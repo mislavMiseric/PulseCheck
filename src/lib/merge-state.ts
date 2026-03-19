@@ -6,6 +6,7 @@ export interface Question {
   votes: number[];
   allowOther: boolean;
   otherTexts: string[];
+  multipleChoice: boolean;
   updatedAt: number;
 }
 

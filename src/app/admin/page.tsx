@@ -230,6 +230,7 @@ function CreateQuestionForm({
   const [text, setText] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [allowOther, setAllowOther] = useState(false);
+  const [multipleChoice, setMultipleChoice] = useState(false);
   const [loading, setLoading] = useState(false);
 
   function addOption() {
@@ -253,7 +254,7 @@ function CreateQuestionForm({
       const res = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, options, allowOther }),
+        body: JSON.stringify({ text, options, allowOther, multipleChoice }),
         credentials: 'include',
       });
       if (!res.ok) {
@@ -269,6 +270,7 @@ function CreateQuestionForm({
       setText('');
       setOptions(['', '']);
       setAllowOther(false);
+      setMultipleChoice(false);
       showToast('Question created');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed');
@@ -336,17 +338,31 @@ function CreateQuestionForm({
           )}
         </div>
 
-        <label className="flex cursor-pointer items-center gap-3">
-          <input
-            type="checkbox"
-            checked={allowOther}
-            onChange={(e) => setAllowOther(e.target.checked)}
-            className="h-4 w-4 rounded border-white/20 bg-white/5 accent-[#7E5BB6]"
-          />
-          <span className="text-sm text-white/75">
-            Allow &ldquo;Other&rdquo; (free-text) option
-          </span>
-        </label>
+        <div className="space-y-2">
+          <label className="flex cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              checked={allowOther}
+              onChange={(e) => setAllowOther(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-[#7E5BB6]"
+            />
+            <span className="text-sm text-white/75">
+              Allow &ldquo;Other&rdquo; (free-text) option
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              checked={multipleChoice}
+              onChange={(e) => setMultipleChoice(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-[#7E5BB6]"
+            />
+            <span className="text-sm text-white/75">
+              Multiple choice (allow selecting multiple options)
+            </span>
+          </label>
+        </div>
 
         <Button type="submit" disabled={loading} className="w-full justify-center">
           {loading ? 'Creating...' : 'Create Question'}
@@ -538,11 +554,18 @@ function QuestionList({
               <p className="text-sm text-white/50">
                 {q.options.join(' / ')}
               </p>
-              {q.allowOther && (
-                <span className="mt-1 inline-block text-xs text-[#9B76D4]">
-                  + Other (free-text)
-                </span>
-              )}
+              <div className="mt-1 flex flex-wrap gap-2">
+                {q.multipleChoice && (
+                  <span className="inline-block text-xs text-[#9B76D4]">
+                    Multiple choice
+                  </span>
+                )}
+                {q.allowOther && (
+                  <span className="inline-block text-xs text-[#9B76D4]">
+                    + Other (free-text)
+                  </span>
+                )}
+              </div>
               {q.status === 'closed' && (
                 <p className="mt-1 text-xs text-white/40">
                   Votes: {q.votes.join(', ')}
