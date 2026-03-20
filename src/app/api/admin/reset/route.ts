@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   const authResult = requireAdmin(request);
   if (authResult instanceof NextResponse) return authResult;
 
-  resetSession();
+  await resetSession();
   return NextResponse.json({ ok: true });
 }

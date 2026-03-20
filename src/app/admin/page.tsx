@@ -1,17 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/Badge';
 import { BarChart } from '@/components/BarChart';
-import { mergeState, type SessionState } from '@/lib/merge-state';
+import type { SessionState } from '@/lib/merge-state';
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [state, setState] = useState<SessionState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/status', { credentials: 'include' }).then((res) => {
@@ -22,35 +21,18 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
-
-    function connectSSE() {
-      if (cancelled) return;
-      const es = new EventSource('/api/events');
-      esRef.current = es;
-      es.addEventListener('state', (e) => {
-        const incoming: SessionState = JSON.parse(e.data);
-        setState((prev) => mergeState(prev, incoming));
-      });
-      es.onerror = () => {
-        es.close();
-        if (!cancelled) setTimeout(connectSSE, 2000);
-      };
+    async function poll() {
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+          const incoming: SessionState = await res.json();
+          if (!cancelled) setState(incoming);
+        }
+      } catch { /* retry on next interval */ }
     }
-
-    connectSSE();
-
-    const reconnectTimer = setInterval(() => {
-      if (!cancelled) {
-        esRef.current?.close();
-        connectSSE();
-      }
-    }, 10_000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(reconnectTimer);
-      esRef.current?.close();
-    };
+    poll();
+    const timer = setInterval(() => { if (!cancelled) poll(); }, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, [authed]);
 
   function showToast(msg: string) {
@@ -81,7 +63,6 @@ export default function AdminPage() {
           method: 'POST',
           credentials: 'include',
         }).then(() => {
-          esRef.current?.close();
           setAuthed(false);
           setState(null);
         });

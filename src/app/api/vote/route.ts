@@ -32,7 +32,7 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      recordVotes(questionId, optionIndices, otherText);
+      await recordVotes(questionId, optionIndices, otherText);
     } else {
       if (typeof optionIndex !== 'number' || !Number.isInteger(optionIndex)) {
         return NextResponse.json(
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      recordVote(questionId, optionIndex, otherText);
+      await recordVote(questionId, optionIndex, otherText);
     }
 
     return NextResponse.json({ ok: true });

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const question = addQuestion(
+    const question = await addQuestion(
       text.trim(),
       options.map((o: string) => o.trim()),
       !!allowOther,

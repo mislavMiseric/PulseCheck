@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { BarChart } from '@/components/BarChart';
-import { mergeState, type Question, type SessionState } from '@/lib/merge-state';
+import type { Question, SessionState } from '@/lib/merge-state';
 
 export default function AudiencePage() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -14,41 +14,21 @@ export default function AudiencePage() {
   const [otherText, setOtherText] = useState('');
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    function connectSSE() {
-      if (cancelled) return;
-      const es = new EventSource('/api/events');
-      esRef.current = es;
-
-      es.addEventListener('state', (e) => {
-        const incoming: SessionState = JSON.parse(e.data);
-        setState((prev) => mergeState(prev, incoming));
-      });
-
-      es.onerror = () => {
-        es.close();
-        if (!cancelled) setTimeout(connectSSE, 2000);
-      };
+    async function poll() {
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+          const incoming: SessionState = await res.json();
+          if (!cancelled) setState(incoming);
+        }
+      } catch { /* retry on next interval */ }
     }
-
-    connectSSE();
-
-    const reconnectTimer = setInterval(() => {
-      if (!cancelled) {
-        esRef.current?.close();
-        connectSSE();
-      }
-    }, 10_000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(reconnectTimer);
-      esRef.current?.close();
-    };
+    poll();
+    const timer = setInterval(() => { if (!cancelled) poll(); }, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, []);
 
   useEffect(() => {
@@ -81,36 +61,22 @@ export default function AudiencePage() {
     const body: Record<string, unknown> = { questionId, optionIndex };
     if (text) body.otherText = text;
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await fetch('/api/vote', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (res.ok) {
-          setVotedIds((prev) => new Set(prev).add(questionId));
-          setShowOtherInput(false);
-          setOtherText('');
-          setVoting(false);
-          return;
-        }
+    try {
+      const res = await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setVotedIds((prev) => new Set(prev).add(questionId));
+        setShowOtherInput(false);
+        setOtherText('');
+      } else {
         const data = await res.json();
-        const isRetryable =
-          attempt < 2 &&
-          (data.error?.includes('not found') || data.error?.includes('not open'));
-        if (isRetryable) {
-          await new Promise((r) => setTimeout(r, 500));
-          continue;
-        }
-        throw new Error(data.error || 'Vote failed');
-      } catch (err) {
-        if (attempt === 2 || !(err instanceof Error) || !err.message.includes('not found')) {
-          setError(err instanceof Error ? err.message : 'Vote failed');
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 500));
+        setError(data.error || 'Vote failed');
       }
+    } catch {
+      setError('Vote failed');
     }
     setVoting(false);
   }
@@ -143,36 +109,22 @@ export default function AudiencePage() {
     };
     if (otherText.trim()) body.otherText = otherText.trim();
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await fetch('/api/vote', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (res.ok) {
-          setVotedIds((prev) => new Set(prev).add(questionId));
-          setSelectedIndices(new Set());
-          setOtherText('');
-          setVoting(false);
-          return;
-        }
+    try {
+      const res = await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setVotedIds((prev) => new Set(prev).add(questionId));
+        setSelectedIndices(new Set());
+        setOtherText('');
+      } else {
         const data = await res.json();
-        const isRetryable =
-          attempt < 2 &&
-          (data.error?.includes('not found') || data.error?.includes('not open'));
-        if (isRetryable) {
-          await new Promise((r) => setTimeout(r, 500));
-          continue;
-        }
-        throw new Error(data.error || 'Vote failed');
-      } catch (err) {
-        if (attempt === 2 || !(err instanceof Error) || !err.message.includes('not found')) {
-          setError(err instanceof Error ? err.message : 'Vote failed');
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 500));
+        setError(data.error || 'Vote failed');
       }
+    } catch {
+      setError('Vote failed');
     }
     setVoting(false);
   }

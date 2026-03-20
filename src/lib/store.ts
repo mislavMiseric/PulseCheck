@@ -1,4 +1,4 @@
-import { broadcast } from './event-bus';
+import { createClient } from 'redis';
 
 export interface Question {
   id: string;
@@ -19,33 +19,37 @@ export interface SessionState {
   version: number;
 }
 
-const GLOBAL_KEY = '__pulsecheck_store__';
+const REDIS_KEY = 'pulsecheck:session';
 
-function getStore(): SessionState {
-  const g = globalThis as unknown as Record<string, SessionState>;
-  if (!g[GLOBAL_KEY]) {
-    g[GLOBAL_KEY] = {
-      questions: [],
-      activeQuestionId: null,
-      lastClosedQuestionId: null,
-      version: 0,
-    };
-  }
-  return g[GLOBAL_KEY];
+const redis = await createClient({ url: process.env.REDIS_URL }).connect();
+
+const DEFAULT_STATE: SessionState = {
+  questions: [],
+  activeQuestionId: null,
+  lastClosedQuestionId: null,
+  version: 0,
+};
+
+async function readState(): Promise<SessionState> {
+  const raw = await redis.get(REDIS_KEY);
+  return raw ? JSON.parse(raw) : { ...DEFAULT_STATE };
 }
 
-function touch() {
-  const s = getStore();
-  s.version++;
-  broadcast('state', getState());
+async function writeState(state: SessionState): Promise<void> {
+  await redis.set(REDIS_KEY, JSON.stringify(state));
 }
 
-export function getState(): SessionState {
-  return { ...getStore() };
+export async function getState(): Promise<SessionState> {
+  return readState();
 }
 
-export function addQuestion(text: string, options: string[], allowOther = false, multipleChoice = false): Question {
-  const store = getStore();
+export async function addQuestion(
+  text: string,
+  options: string[],
+  allowOther = false,
+  multipleChoice = false,
+): Promise<Question> {
+  const state = await readState();
   const allOptions = allowOther ? [...options, 'Other'] : options;
   const q: Question = {
     id: crypto.randomUUID(),
@@ -58,18 +62,19 @@ export function addQuestion(text: string, options: string[], allowOther = false,
     multipleChoice,
     updatedAt: Date.now(),
   };
-  store.questions.push(q);
-  touch();
+  state.questions.push(q);
+  state.version++;
+  await writeState(state);
   return q;
 }
 
-export function openQuestion(id: string): Question {
-  const store = getStore();
-  const q = store.questions.find((q) => q.id === id);
+export async function openQuestion(id: string): Promise<Question> {
+  const state = await readState();
+  const q = state.questions.find((q) => q.id === id);
   if (!q) throw new Error('Question not found');
 
   const now = Date.now();
-  for (const other of store.questions) {
+  for (const other of state.questions) {
     if (other.status === 'open') {
       other.status = 'closed';
       other.updatedAt = now;
@@ -80,28 +85,34 @@ export function openQuestion(id: string): Question {
   q.votes = new Array(q.options.length).fill(0);
   q.otherTexts = [];
   q.updatedAt = now;
-  store.activeQuestionId = id;
-  touch();
+  state.activeQuestionId = id;
+  state.version++;
+  await writeState(state);
   return q;
 }
 
-export function closeQuestion(): Question | null {
-  const store = getStore();
-  if (!store.activeQuestionId) return null;
-  const q = store.questions.find((q) => q.id === store.activeQuestionId);
+export async function closeQuestion(): Promise<Question | null> {
+  const state = await readState();
+  if (!state.activeQuestionId) return null;
+  const q = state.questions.find((q) => q.id === state.activeQuestionId);
   if (!q) return null;
 
   q.status = 'closed';
   q.updatedAt = Date.now();
-  store.lastClosedQuestionId = store.activeQuestionId;
-  store.activeQuestionId = null;
-  touch();
+  state.lastClosedQuestionId = state.activeQuestionId;
+  state.activeQuestionId = null;
+  state.version++;
+  await writeState(state);
   return q;
 }
 
-export function recordVote(questionId: string, optionIndex: number, otherText?: string): void {
-  const store = getStore();
-  const q = store.questions.find((q) => q.id === questionId);
+export async function recordVote(
+  questionId: string,
+  optionIndex: number,
+  otherText?: string,
+): Promise<void> {
+  const state = await readState();
+  const q = state.questions.find((q) => q.id === questionId);
   if (!q) throw new Error('Question not found');
   if (q.status !== 'open') throw new Error('Question is not open');
   if (optionIndex < 0 || optionIndex >= q.options.length) {
@@ -116,12 +127,17 @@ export function recordVote(questionId: string, optionIndex: number, otherText?: 
     q.otherTexts.push(otherText.trim());
   }
   q.updatedAt = Date.now();
-  touch();
+  state.version++;
+  await writeState(state);
 }
 
-export function recordVotes(questionId: string, optionIndices: number[], otherText?: string): void {
-  const store = getStore();
-  const q = store.questions.find((q) => q.id === questionId);
+export async function recordVotes(
+  questionId: string,
+  optionIndices: number[],
+  otherText?: string,
+): Promise<void> {
+  const state = await readState();
+  const q = state.questions.find((q) => q.id === questionId);
   if (!q) throw new Error('Question not found');
   if (q.status !== 'open') throw new Error('Question is not open');
   if (optionIndices.length === 0) throw new Error('At least one option must be selected');
@@ -146,13 +162,10 @@ export function recordVotes(questionId: string, optionIndices: number[], otherTe
     q.otherTexts.push(otherText.trim());
   }
   q.updatedAt = Date.now();
-  touch();
+  state.version++;
+  await writeState(state);
 }
 
-export function resetSession(): void {
-  const store = getStore();
-  store.questions = [];
-  store.activeQuestionId = null;
-  store.lastClosedQuestionId = null;
-  touch();
+export async function resetSession(): Promise<void> {
+  await writeState({ ...DEFAULT_STATE, version: 0 });
 }

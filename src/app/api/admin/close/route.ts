@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const authResult = requireAdmin(request);
   if (authResult instanceof NextResponse) return authResult;
 
-  const question = closeQuestion();
+  const question = await closeQuestion();
   if (!question) {
     return NextResponse.json(
       { error: 'No question is currently open' },

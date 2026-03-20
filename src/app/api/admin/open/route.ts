@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const question = openQuestion(questionId);
+    const question = await openQuestion(questionId);
     return NextResponse.json({ question });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Bad request';
