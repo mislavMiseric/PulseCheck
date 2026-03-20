@@ -166,6 +166,15 @@ export async function recordVotes(
   await writeState(state);
 }
 
+export async function deleteQuestion(id: string): Promise<void> {
+  const state = await readState();
+  state.questions = state.questions.filter((q) => q.id !== id);
+  if (state.activeQuestionId === id) state.activeQuestionId = null;
+  if (state.lastClosedQuestionId === id) state.lastClosedQuestionId = null;
+  state.version++;
+  await writeState(state);
+}
+
 export async function resetSession(): Promise<void> {
   await writeState({ ...DEFAULT_STATE, version: 0 });
 }

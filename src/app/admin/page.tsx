@@ -481,6 +481,36 @@ function QuestionList({
   showToast: (msg: string) => void;
 }) {
   const [opening, setOpening] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleDelete(questionId: string) {
+    setDeleting(questionId);
+    setState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        questions: prev.questions.filter((q) => q.id !== questionId),
+        activeQuestionId: prev.activeQuestionId === questionId ? null : prev.activeQuestionId,
+        lastClosedQuestionId: prev.lastClosedQuestionId === questionId ? null : prev.lastClosedQuestionId,
+        version: prev.version + 1,
+      };
+    });
+    try {
+      const res = await fetch('/api/admin/questions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId }),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        showToast('Question deleted');
+      } else {
+        showToast('Failed to delete question');
+      }
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   async function handleOpen(questionId: string) {
     setOpening(questionId);
@@ -556,16 +586,28 @@ function QuestionList({
                 </p>
               )}
             </div>
-            {q.status === 'draft' && (
-              <Button
-                variant="primary"
-                onClick={() => handleOpen(q.id)}
-                disabled={opening !== null}
-                className="shrink-0"
-              >
-                {opening === q.id ? 'Opening...' : 'Open'}
-              </Button>
-            )}
+            <div className="flex shrink-0 gap-2">
+              {q.status === 'draft' && (
+                <Button
+                  variant="primary"
+                  onClick={() => handleOpen(q.id)}
+                  disabled={opening !== null || deleting !== null}
+                  className="shrink-0"
+                >
+                  {opening === q.id ? 'Opening...' : 'Open'}
+                </Button>
+              )}
+              {q.status !== 'open' && (
+                <Button
+                  variant="danger"
+                  onClick={() => handleDelete(q.id)}
+                  disabled={deleting !== null || opening !== null}
+                  className="shrink-0"
+                >
+                  {deleting === q.id ? 'Deleting...' : 'Delete'}
+                </Button>
+              )}
+            </div>
           </Card>
         ))}
       </div>
